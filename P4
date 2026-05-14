@@ -1,0 +1,92 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix, roc_curve, auc
+
+url = r"C:\Users\Admin\Downloads\Stock market\Master_file(2000-2025).csv"
+
+data = pd.read_csv(url)
+
+print(data.head())
+print(data.columns)
+
+data.columns = ["Date", "Open", "High", "Low", "Close", "Shares Traded", "Turnover (? Cr)"]
+
+data.dropna(inplace=True)
+
+data["MA5"] = data["Close"].rolling(5).mean()
+data["MA10"] = data["Close"].rolling(10).mean()
+
+d = data["Close"].diff()
+
+data["RSI"] = 100 - 100 / (
+    1 + d.clip(lower=0).rolling(14).mean() /
+    (-d.clip(upper=0)).rolling(14).mean()
+)
+
+data["Target"] = (data["Close"].shift(-1) > data["Close"]).astype(int)
+
+data.dropna(inplace=True)
+
+X = StandardScaler().fit_transform(
+    data[[
+        "Open","High", "Low","Close", "Shares Traded", "Turnover (? Cr)", "MA5","MA10", "RSI"
+    ]]
+)
+
+y = data["Target"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+model = LogisticRegression(max_iter=3000).fit(X_train, y_train)
+
+pred = model.predict(X_test)
+
+prob = model.predict_proba(X_test)[:, 1]
+
+print("Live Accuracy:", model.score(X_test, y_test))
+
+plt.figure()
+
+plt.plot(data["Close"])
+
+plt.title("Live RELIANCE Closing Price")
+
+plt.xlabel("Days")
+
+plt.ylabel("Price")
+
+plt.grid()
+
+plt.show()
+
+plt.figure()
+
+plt.imshow(confusion_matrix(y_test, pred))
+
+plt.title("Confusion Matrix")
+
+plt.colorbar()
+
+plt.show()
+
+fpr, tpr, _ = roc_curve(y_test, prob)
+
+plt.figure()
+
+plt.plot(fpr, tpr)
+
+plt.title("ROC Curve (AUC=%.2f)" % auc(fpr, tpr))
+
+plt.xlabel("False Positive Rate")
+
+plt.ylabel("True Positive Rate")
+
+plt.grid()
+
+plt.show()
